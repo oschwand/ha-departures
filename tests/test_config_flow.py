@@ -2,13 +2,18 @@
 
 from unittest.mock import AsyncMock, patch
 
+from pytest_homeassistant_custom_component.common import MockConfigEntry
+
 from custom_components.ha_departures.config_flow import (
     DeparturesOptionsFlowHandler,
     _extract_lines_from_stop_times,
     _fetch_lines,
 )
-from custom_components.ha_departures.const import CONF_AVAILABLE_LINES, CONF_LINES, DOMAIN
-from pytest_homeassistant_custom_component.common import MockConfigEntry
+from custom_components.ha_departures.const import (
+    CONF_AVAILABLE_LINES,
+    CONF_LINES,
+    DOMAIN,
+)
 
 
 def _stop_time(headsign, direction="1", route="rer-b", name="B", terminus=None):
