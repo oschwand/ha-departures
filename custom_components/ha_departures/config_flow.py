@@ -73,7 +73,28 @@ def _extract_lines_from_stop_times(
 
         lines.append(line)
 
-    return list(set(lines)) if unique else lines
+    return _group_lines(lines) if unique else lines
+
+
+def _group_lines(lines: list[Line]) -> list[Line]:
+    """Group by route and direction, without treating one trip as the destination."""
+    groups: dict[tuple[str, str], list[Line]] = {}
+    for line in lines:
+        groups.setdefault((line.route_id, line.direction_id), []).append(line)
+
+    result = []
+    for (_, direction_id), group in groups.items():
+        line = group[0]
+        if len({item.head_sign for item in group}) > 1:
+            line = Line(
+                route_id=line.route_id,
+                direction_id=direction_id,
+                head_sign=f"Direction {direction_id}",
+                route_short_name=line.route_short_name,
+                mode=line.mode,
+            )
+        result.append(line)
+    return result
 
 
 def _sorted_lines(lines: list[dict[str, Any]]) -> list[dict[str, Any]]:
@@ -108,7 +129,7 @@ async def _fetch_lines(stop_ids: list[str | Stop], unique: bool = True) -> list[
                 },
             )
 
-            lines.extend(_extract_lines_from_stop_times(stop_times, unique=unique))
+            lines.extend(_extract_lines_from_stop_times(stop_times, unique=False))
         except ValueError as err:
             _LOGGER.error(
                 "Error fetching stop times for stop %s: %s, continuing with next stop if available",
@@ -116,7 +137,7 @@ async def _fetch_lines(stop_ids: list[str | Stop], unique: bool = True) -> list[
                 err,
             )
 
-    return list(set(lines)) if unique else lines
+    return _group_lines(lines) if unique else lines
 
 
 class DeparturesFlowHandler(config_entries.ConfigFlow, domain=DOMAIN):
@@ -402,15 +423,15 @@ class DeparturesOptionsFlowHandler(config_entries.OptionsFlow):
             for user_option in lines_user_choose:
                 (route_id, direction_id) = user_option.split("---")
 
+                available_line = next(
+                    line
+                    for line in self._lines_available
+                    if line.route_id == route_id and line.direction_id == direction_id
+                )
                 lines_new_state.append(
                     next(
-                        filter(
-                            lambda x: (
-                                x.route_id == route_id
-                                and x.direction_id == direction_id
-                            ),
-                            self._lines_available,
-                        )
+                        (line for line in self._lines_selected if line == available_line),
+                        available_line,
                     )
                 )
 
