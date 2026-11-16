@@ -100,6 +100,25 @@ def _update(entity) -> None:
         entity._handle_coordinator_update()
 
 
+async def test_line_sensor_includes_all_missions_in_its_direction(hass, coordinator):
+    """Trip headsigns do not restrict the selected route and direction."""
+    love = _departure("love", timedelta(minutes=5))
+    love.head_sign = "LOVE"
+    ppit = _departure("ppit", timedelta(minutes=10))
+    ppit.head_sign = "PPIT"
+    other_direction = _departure("other", timedelta(minutes=15))
+    other_direction.direction_id = "1"
+    coordinator.data = [love, ppit, other_direction]
+    sensor = DeparturesSensor(hass, coordinator, {**LINE, "head_sign": "Direction 0"})
+
+    _update(sensor)
+
+    assert [time["head_sign"] for time in sensor.extra_state_attributes[ATTR_TIMES]] == [
+        "LOVE",
+        "PPIT",
+    ]
+
+
 # ---------------------------------------------------------------------------
 # Delay sensor
 # ---------------------------------------------------------------------------
