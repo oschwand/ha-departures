@@ -131,6 +131,11 @@ The configuration of integration is made via Home Assistant GUI
 > You will get list of connections provided by the API for selected stop.
 > Select all connection(s) you are interesting in and click on `Submit`
 
+Connections are grouped by route and direction, not by individual trip headsign.
+When the API reports different headsigns for the same route and direction, the
+selection shows the direction ID instead; the `times` attribute retains each
+departure's own `head_sign`.
+
 ![image](assets/setup-step-3.png)
 
 #### Step 4 - Define a name of new hub configuration
