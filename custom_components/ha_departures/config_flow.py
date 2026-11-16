@@ -66,7 +66,8 @@ def _extract_lines_from_stop_times(
         line = Line(
             route_id=stop_time.get("routeId"),
             direction_id=stop_time.get("directionId"),
-            head_sign=stop_time.get("headsign"),
+            head_sign=(stop_time.get("tripTo") or {}).get("name")
+            or "Terminus inconnu",
             route_short_name=stop_time.get("routeShortName"),
             mode=TransportMode(stop_time.get("mode")),
         )
@@ -77,22 +78,22 @@ def _extract_lines_from_stop_times(
 
 
 def _group_lines(lines: list[Line]) -> list[Line]:
-    """Group by route and direction, without treating one trip as the destination."""
+    """Group by route and direction, collecting their distinct termini."""
     groups: dict[tuple[str, str], list[Line]] = {}
     for line in lines:
         groups.setdefault((line.route_id, line.direction_id), []).append(line)
 
     result = []
-    for (_, direction_id), group in groups.items():
+    for group in groups.values():
         line = group[0]
-        if len({item.head_sign for item in group}) > 1:
-            line = Line(
-                route_id=line.route_id,
-                direction_id=direction_id,
-                head_sign=f"Direction {direction_id}",
-                route_short_name=line.route_short_name,
-                mode=line.mode,
-            )
+        termini = sorted({item.head_sign for item in group if item.head_sign})
+        line = Line(
+            route_id=line.route_id,
+            direction_id=line.direction_id,
+            head_sign=" / ".join(termini) if termini else "Terminus inconnu",
+            route_short_name=line.route_short_name,
+            mode=line.mode,
+        )
         result.append(line)
     return result
 
@@ -428,14 +429,11 @@ class DeparturesOptionsFlowHandler(config_entries.OptionsFlow):
                     for line in self._lines_available
                     if line.route_id == route_id and line.direction_id == direction_id
                 )
-                lines_new_state.append(
-                    next(
-                        (line for line in self._lines_selected if line == available_line),
-                        available_line,
-                    )
-                )
+                lines_new_state.append(available_line)
 
-            if lines_new_state == self._lines_selected:
+            if _sorted_lines([line.to_dict() for line in lines_new_state]) == _sorted_lines(
+                [line.to_dict() for line in self._lines_selected]
+            ):
                 _LOGGER.debug("No changes on entry configuration detected")
                 return self.async_abort(reason=CONF_ERROR_NO_CHANGES_OPTIONS)
 
